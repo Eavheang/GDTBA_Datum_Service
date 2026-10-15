@@ -29,3 +29,6 @@ app.onError((err, c) => {
 });
 
 export type AppType = typeof app;
+
+// Vercel uses src/app.ts as the function entry.
+export default app;
