@@ -1,8 +1,11 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
+import { except } from "hono/combine";
 import { logger } from "hono/logger";
 
 import { converter } from "./converter/routes";
+import { requireUser } from "./middleware/auth";
+import { users } from "./users/routes";
 
 export const app = new Hono()
   .use(logger())
@@ -13,8 +16,11 @@ export const app = new Hono()
       onError: (c) => c.json({ message: "Request too large" }, 413),
     }),
   )
+  // Every route needs a signed-in user; /health stays open for uptime checks.
+  .use(except("/health", requireUser))
   .get("/health", (c) => c.json({ ok: true }))
-  .route("/converter", converter);
+  .route("/converter", converter)
+  .route("/admin/users", users);
 
 app.notFound((c) => c.json({ message: "Not Found" }, 404));
 app.onError((err, c) => {

@@ -1,9 +1,11 @@
 import { expect, test } from "bun:test";
 
 import { app } from "../app";
+import { converter } from "./routes";
 
+// The router itself; the auth guard lives on the app and is tested last.
 const post = (path: string, body: unknown) =>
-  app.request(`/converter${path}`, {
+  converter.request(path, {
     method: "POST",
     body: JSON.stringify(body),
     headers: { "Content-Type": "application/json" },
@@ -32,21 +34,27 @@ test("convert rejects unknown or equal systems", async () => {
 });
 
 test("import names the expected headers on a bad file", async () => {
-  const res = await app.request("/converter/import", { method: "POST", body: "ID,X\n1,2" });
+  const res = await converter.request("/import", { method: "POST", body: "ID,X\n1,2" });
   const body = await res.json();
   expect(body.ok).toBe(false);
   expect(body.expected).toContain("Easting_WGS84,Northing_WGS84");
 });
 
 test("template and export are CSV downloads", async () => {
-  const tpl = await app.request("/converter/template/wgs84-dms");
+  const tpl = await converter.request("/template/wgs84-dms");
   expect(tpl.headers.get("Content-Disposition")).toContain("template-wgs84-dms.csv");
   expect(await tpl.text()).toBe("Latitude_WGS84_DMS,Longitude_WGS84_DMS\r\n");
-  expect((await app.request("/converter/template/nope")).status).toBe(400);
+  expect((await converter.request("/template/nope")).status).toBe(400);
   const out = await post("/export", {
     from: "wgs84",
     to: "indian60",
     rows: [{ E: "218426", N: "1573915" }],
   });
   expect(await out.text()).toContain("218844.944,1573591.420");
+});
+
+test("app rejects requests without a bearer token, except /health", async () => {
+  expect((await app.request("/converter/template/wgs84")).status).toBe(401);
+  expect((await app.request("/admin/users")).status).toBe(401);
+  expect((await app.request("/health")).status).toBe(200);
 });
