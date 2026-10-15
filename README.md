@@ -24,7 +24,7 @@ bun test         # geodesy, MGRS, lat/lon, CSV and route tests
 | PATCH  | `/admin/users/:id`            | Admin only. `{ role }`                                                                                           |
 | DELETE | `/admin/users/:id`            | Admin only.                                                                                                      |
 
-`/admin/*` needs `Authorization: Bearer <Supabase access token>` of a user whose `public.profiles.role` is `admin`; without Supabase env vars it returns 503.
+Every route except `/health` needs `Authorization: Bearer <Supabase access token>` of a live user (401 otherwise); `/admin/*` also needs `public.profiles.role` = `admin` (403). Without Supabase env vars guarded routes return 503.
 
 Systems: `wgs84`, `indian60`, and each with `-mgrs`, `-dd`, `-dms` or `-ddm`. `deg` is the input point as WGS84 `[lat, lon]`, for plotting.
 
@@ -32,7 +32,8 @@ Systems: `wgs84`, `indian60`, and each with `-mgrs`, `-dd`, `-dms` or `-ddm`. `d
 
 ```
 src/index.ts              Bun server entry
-src/app.ts                Hono app: middleware, error handlers, mounted feature routers
+src/app.ts                Hono app: middleware, auth guard, error handlers, mounted feature routers
+src/middleware/auth.ts    Supabase client, requireUser / requireAdmin, shared factory
 src/converter/routes.ts   converter routes (zod-validated)
 src/converter/*.ts        conversion logic, plain TypeScript with tests beside it
 ```

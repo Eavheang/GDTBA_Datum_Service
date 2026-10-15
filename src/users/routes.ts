@@ -1,43 +1,15 @@
 import { zValidator } from "@hono/zod-validator";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { Hono } from "hono";
-import { createMiddleware } from "hono/factory";
 import { z } from "zod";
 
-const url = process.env.SUPABASE_URL;
-const secret = process.env.SUPABASE_SERVICE_ROLE_KEY;
-// Service-role client: bypasses RLS and can manage auth users. Never expose its key.
-// Null when unconfigured, so the rest of the API (and its tests) runs without Supabase.
-const admin =
-  url && secret
-    ? createClient(url, secret, { auth: { persistSession: false, autoRefreshToken: false } })
-    : null;
+import { factory, requireAdmin } from "../middleware/auth";
 
 const roleSchema = z.enum(["admin", "user"]);
 const id = z.object({ id: z.uuid() });
 
-/** Fails closed: the caller's token must resolve to a live user whose public.profiles role is admin. */
-const requireAdmin = createMiddleware<{ Variables: { supabase: SupabaseClient } }>(
-  async (c, next) => {
-    if (!admin) return c.json({ message: "User admin is not configured" }, 503);
-    const token = c.req.header("Authorization")?.replace(/^Bearer /, "");
-    if (!token) return c.json({ message: "Unauthorized" }, 401);
-    const { data } = await admin.auth.getUser(token);
-    if (!data.user) return c.json({ message: "Unauthorized" }, 401);
-    const { data: profile } = await admin
-      .from("profiles")
-      .select("role")
-      .eq("id", data.user.id)
-      .maybeSingle();
-    if (profile?.role !== "admin") return c.json({ message: "Forbidden" }, 403);
-    c.set("supabase", admin);
-    await next();
-  },
-);
-
 const fail = (message: string) => Response.json({ message }, { status: 400 });
 
-export const users = new Hono()
+export const users = factory
+  .createApp()
   .use(requireAdmin)
   .get("/", async (c) => {
     const [list, profiles] = await Promise.all([
