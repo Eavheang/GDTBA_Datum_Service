@@ -3,6 +3,7 @@ import { bodyLimit } from "hono/body-limit";
 import { logger } from "hono/logger";
 
 import { converter } from "./converter/routes";
+import { users } from "./users/routes";
 
 export const app = new Hono()
   .use(logger())
@@ -14,7 +15,8 @@ export const app = new Hono()
     }),
   )
   .get("/health", (c) => c.json({ ok: true }))
-  .route("/converter", converter);
+  .route("/converter", converter)
+  .route("/admin/users", users);
 
 app.notFound((c) => c.json({ message: "Not Found" }, 404));
 app.onError((err, c) => {
